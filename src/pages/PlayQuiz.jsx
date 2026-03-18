@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
   Radio,
-  RadioGroup,
   FormControlLabel,
   Typography,
   LinearProgress,
@@ -11,7 +10,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Checkbox,
+  TextField
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { getQuestions } from "../utils/localStorage";
@@ -23,9 +24,18 @@ export default function PlayQuiz() {
 
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState("");
+  const [multiSelected, setMultiSelected] = useState([]);
+  const [textAnswer, setTextAnswer] = useState("");
   const [answers, setAnswers] = useState({});
-  const [answeredCount, setAnsweredCount] = useState(0);
   const [openConfirm, setOpenConfirm] = useState(false);
+
+  // ✅ Disable body scroll (important)
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, []);
 
   if (!questions || questions.length === 0) {
     return (
@@ -40,37 +50,126 @@ export default function PlayQuiz() {
     );
   }
 
-  const current = questions[index];
+  const raw = questions[index];
+  const current = {
+    question: raw.question,
+    type: (raw.type || raw.questionType || "").toLowerCase(),
+    options:
+      raw.options ||
+      [raw.option1, raw.option2, raw.option3, raw.option4].filter(Boolean),
+    correct: raw.correct
+  };
+
+  const optionLabels = ["A", "B", "C", "D"];
+
+  const getQuestionTypeLabel = (type) => {
+    switch (type) {
+      case "single":
+        return "Single Choice";
+      case "multi":
+        return "Multiple Choice";
+      case "short":
+        return "Short Answer";
+      case "descriptive":
+        return "Long Answer";
+      default:
+        return "Unknown Type";
+    }
+  };
+
+  const saveAnswer = (value) => {
+    setAnswers({ ...answers, [index]: value });
+  };
 
   const handleSelect = (value) => {
-    const newAnswers = { ...answers, [index]: value };
-    setAnswers(newAnswers);
     setSelected(value);
-    setAnsweredCount(Object.keys(newAnswers).length);
+    saveAnswer(value);
+  };
+
+  const handleMultiSelect = (value) => {
+    let updated = [...multiSelected];
+    updated.includes(value)
+      ? (updated = updated.filter((v) => v !== value))
+      : updated.push(value);
+
+    setMultiSelected(updated);
+    saveAnswer(updated);
+  };
+
+  const handleTextChange = (value) => {
+    setTextAnswer(value);
+    saveAnswer(value);
+  };
+
+  const loadAnswer = (qIndex) => {
+    const ans = answers[qIndex];
+    const q = questions[qIndex];
+    const type = (q.type || q.questionType || "").toLowerCase();
+
+    if (!ans) {
+      setSelected("");
+      setMultiSelected([]);
+      setTextAnswer("");
+      return;
+    }
+
+    if (type === "single") {
+      setSelected(ans);
+      setMultiSelected([]);
+      setTextAnswer("");
+    } else if (type === "multi") {
+      setMultiSelected(ans);
+      setSelected("");
+      setTextAnswer("");
+    } else {
+      setTextAnswer(ans);
+      setSelected("");
+      setMultiSelected([]);
+    }
   };
 
   const calculateScore = () => {
     let score = 0;
+
     Object.keys(answers).forEach((i) => {
+      const q = questions[i];
       const ans = answers[i];
-      if (parseInt(ans) - 1 === questions[i].correct) score += 1;
+      const type = (q.type || q.questionType || "").toLowerCase();
+
+      if (type === "single") {
+        if (parseInt(ans) - 1 === q.correct) score++;
+      } else if (type === "multi") {
+        const correctAnswers = Array.isArray(q.correct)
+          ? q.correct.map(String)
+          : [];
+        if (
+          Array.isArray(ans) &&
+          ans.length === correctAnswers.length &&
+          ans.every((a) => correctAnswers.includes(a))
+        ) {
+          score++;
+        }
+      }
     });
+
     return score;
   };
 
   const handleNext = () => {
     if (index + 1 < questions.length) {
-      setIndex(index + 1);
-      setSelected(answers[index + 1] || "");
+      const nextIndex = index + 1;
+      setIndex(nextIndex);
+      loadAnswer(nextIndex);
     } else {
-      setOpenConfirm(true); // Open confirmation dialog
+      setOpenConfirm(true);
     }
   };
 
   const handlePrevious = () => {
     if (index === 0) return;
-    setIndex(index - 1);
-    setSelected(answers[index - 1] || "");
+    const prevIndex = index - 1;
+    setIndex(prevIndex);
+    loadAnswer(prevIndex);
   };
 
   const handleConfirmSubmit = () => {
@@ -79,187 +178,154 @@ export default function PlayQuiz() {
     });
   };
 
-  const handleCancelSubmit = () => {
-    setOpenConfirm(false);
-  };
+  const answeredCount = Object.values(answers).filter((ans) => {
+    if (Array.isArray(ans)) return ans.length > 0;
+    return ans !== "" && ans !== null && ans !== undefined;
+  }).length;
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        position: "fixed",   // ✅ FULLSCREEN (removes navbar effect)
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        overflow: "hidden",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         backgroundImage: `url(${bgImage})`,
         backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        p: 2,
-        position: "relative",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          bgcolor: "rgba(0,0,0,0.2)"
-        }
+        backgroundPosition: "center"
       }}
     >
       <Paper
-        elevation={15}
+        elevation={6}
         sx={{
-          position: "relative",
-          maxWidth: 700,
+          maxWidth: 720,
+          maxHeight: "90vh",
           width: "100%",
-          p: 5,
-          borderRadius: 5,
-          bgcolor: "rgba(255,255,255,0.97)",
-          boxShadow: "0 16px 32px rgba(0,0,0,0.25)"
+          p: 4,
+          borderRadius: 3,
+          bgcolor: "#ffffff",
+          overflowY: "auto"
         }}
       >
-        {/* Headline */}
-        <Typography
-          variant="h4"
-          sx={{
-            mb: 3,
-            fontWeight: "700",
-            textAlign: "center",
-            background: "linear-gradient(to right, #ff6b6b, #f8e71c)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent"
-          }}
-        >
+        <Typography variant="h5" mb={1} fontWeight="bold">
           Question {index + 1} of {questions.length}
         </Typography>
 
-        {/* Question */}
-        <Typography
-          variant="h5"
-          sx={{
-            mb: 4,
-            fontWeight: "500",
-            textAlign: "center",
-            color: "#333"
-          }}
-        >
+        <Typography mb={3} color="text.secondary">
+          {getQuestionTypeLabel(current.type)}
+        </Typography>
+
+        <Typography variant="h6" mb={3}>
           {current.question}
         </Typography>
 
-        {/* Options */}
-        <RadioGroup
-          value={selected}
-          onChange={(e) => handleSelect(e.target.value)}
-          sx={{ mb: 4 }}
-        >
-          {current.options.map((opt, i) => (
-            <FormControlLabel
-              key={i}
-              value={(i + 1).toString()}
-              control={<Radio sx={{ color: "#6a11cb", "&.Mui-checked": { color: "#ff6b6b" } }} />}
-              label={opt}
-              sx={{
-                mb: 2,
-                p: 2,
-                borderRadius: 3,
-                border: "1px solid #ddd",
-                transition: "all 0.2s ease",
-                backgroundColor: selected === (i + 1).toString() ? "rgba(255,107,107,0.1)" : "#fff",
-                "&:hover": { bgcolor: "rgba(102,126,234,0.1)", transform: "scale(1.02)" },
-                boxShadow:
-                  selected === (i + 1).toString()
-                    ? "0 4px 12px rgba(255,107,107,0.3)"
-                    : "none"
-              }}
-            />
-          ))}
-        </RadioGroup>
+        {/* OPTIONS */}
+        <Box display="flex" flexDirection="column" gap={2}>
+          {current.type === "single" &&
+            current.options?.map((opt, i) => (
+              <Box
+                key={i}
+                onClick={() => handleSelect((i + 1).toString())}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px solid #ddd",
+                  backgroundColor:
+                    selected === (i + 1).toString() ? "#e0f7fa" : "#fafafa",
+                  cursor: "pointer"
+                }}
+              >
+                <FormControlLabel
+                  sx={{ width: "100%", m: 0 }}
+                  control={
+                    <Radio checked={selected === (i + 1).toString()} />
+                  }
+                  label={`${optionLabels[i]}. ${opt}`}
+                />
+              </Box>
+            ))}
 
-        {/* Progress */}
-        <Box sx={{ display: "flex", alignItems: "center", mb: 4 }}>
+          {current.type === "multi" &&
+            current.options?.map((opt, i) => (
+              <Box
+                key={i}
+                onClick={() => handleMultiSelect((i + 1).toString())}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  border: "1px solid #ddd",
+                  backgroundColor: multiSelected.includes(
+                    (i + 1).toString()
+                  )
+                    ? "#e8f5e9"
+                    : "#fafafa",
+                  cursor: "pointer"
+                }}
+              >
+                <FormControlLabel
+                  sx={{ width: "100%", m: 0 }}
+                  control={
+                    <Checkbox
+                      checked={multiSelected.includes(
+                        (i + 1).toString()
+                      )}
+                    />
+                  }
+                  label={`${optionLabels[i]}. ${opt}`}
+                />
+              </Box>
+            ))}
+
+          {(current.type === "short" || current.type === "descriptive") && (
+            <TextField
+              fullWidth
+              multiline={current.type === "descriptive"}
+              rows={current.type === "descriptive" ? 4 : 1}
+              value={textAnswer}
+              onChange={(e) => handleTextChange(e.target.value)}
+            />
+          )}
+        </Box>
+
+        <Box mt={4}>
           <LinearProgress
             variant="determinate"
             value={(answeredCount / questions.length) * 100}
-            sx={{
-              flex: 1,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: "#eee",
-              "& .MuiLinearProgress-bar": {
-                background: "linear-gradient(to right, #ff6b6b, #f8e71c)"
-              }
-            }}
           />
-          <Typography variant="body1" sx={{ minWidth: 40, ml: 2 }}>
-            {answeredCount}/{questions.length}
+          <Typography textAlign="right" mt={1}>
+            {answeredCount}/{questions.length} answered
           </Typography>
         </Box>
 
-        {/* Navigation */}
-        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+        <Box display="flex" justifyContent="space-between" mt={4}>
           <Button
-            variant="contained"
+            variant="outlined"
             disabled={index === 0}
             onClick={handlePrevious}
-            sx={{
-              py: 1.5,
-              width: "48%",
-              fontWeight: "bold",
-              background: "linear-gradient(to right, #6a11cb, #2575fc)",
-              color: "#fff",
-              "&:hover": { transform: "scale(1.05)" }
-            }}
           >
             Previous
           </Button>
 
-          <Button
-            variant="contained"
-            onClick={handleNext}
-            sx={{
-              py: 1.5,
-              width: "48%",
-              fontWeight: "bold",
-              background: "linear-gradient(to right, #ff6b6b, #f8e71c)",
-              color: "#fff",
-              "&:hover": { transform: "scale(1.05)" }
-            }}
-          >
-            {index + 1 === questions.length ? "Finish Quiz" : "Next"}
+          <Button variant="contained" onClick={handleNext}>
+            {index + 1 === questions.length ? "Finish" : "Next"}
           </Button>
         </Box>
       </Paper>
 
-      {/* Confirmation Dialog with progress bar */}
-      <Dialog open={openConfirm} onClose={handleCancelSubmit}>
+      <Dialog open={openConfirm}>
         <DialogTitle>Submit Quiz?</DialogTitle>
         <DialogContent>
-          <Typography mb={2}>
-            You have answered {answeredCount} out of {questions.length} questions.
+          <Typography>
+            You answered {answeredCount} out of {questions.length}.
           </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={(answeredCount / questions.length) * 100}
-            sx={{
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: "#eee",
-              "& .MuiLinearProgress-bar": {
-                background: "linear-gradient(to right, #ff6b6b, #f8e71c)"
-              }
-            }}
-          />
-          {answeredCount < questions.length && (
-            <Typography mt={2} color="error">
-              Some questions are still unanswered!
-            </Typography>
-          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelSubmit} color="secondary">
-            No
-          </Button>
+          <Button onClick={() => setOpenConfirm(false)}>No</Button>
           <Button onClick={handleConfirmSubmit} variant="contained">
             Yes
           </Button>

@@ -11,20 +11,27 @@ import {
   Divider,
   Stack,
 } from "@mui/material";
+
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+
 import QuestionTypeModal from "../components/QuestionTypeModal";
 import { useNavigate } from "react-router-dom";
 import bgImage from "../images/main-bg.jpg";
 
-
 export default function CreateQuiz() {
+
   const navigate = useNavigate();
+
   const [showModal, setShowModal] = useState(true);
   const [questionType, setQuestionType] = useState("");
+
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
+
+  const [correctText, setCorrectText] = useState("");
+
   const [options, setOptions] = useState(["", ""]);
   const [correct, setCorrect] = useState("");
   const [questionsList, setQuestionsList] = useState([]);
@@ -38,9 +45,12 @@ export default function CreateQuiz() {
   const removeOption = (index) => {
     const updatedOptions = options.filter((_, i) => i !== index);
     setOptions(updatedOptions);
+
     if (questionType === "single") {
       if (correct === index) setCorrect("");
-    } else {
+    }
+
+    if (questionType === "multi") {
       setCorrect((prev) => prev.filter((i) => i !== index));
     }
   };
@@ -51,229 +61,447 @@ export default function CreateQuiz() {
     setOptions(updated);
   };
 
-  const addQuestionToList = () => {
-    if (!title.trim() || !question.trim()) return alert("Title and Question are required");
-    if (options.some((o) => !o.trim())) return alert("Fill all options");
-    if ((questionType === "single" && correct === "") || (questionType === "multi" && correct.length === 0))
-      return alert("Select correct answer");
+  const handleQuestionChange = (value) => {
+    setQuestion(value);
+  };
 
-    const newQuestion = { title, question, options, correct, questionType };
+  const addQuestionToList = () => {
+
+    if (!questionType) {
+      setShowModal(true);
+      return;
+    }
+
+    if (!title.trim() || !question.trim()) {
+      alert("Title and Question required");
+      return;
+    }
+
+    if (questionType === "single" || questionType === "multi") {
+
+      if (options.some((o) => !o.trim())) {
+        alert("Fill all options");
+        return;
+      }
+
+      if (
+        (questionType === "single" && correct === "") ||
+        (questionType === "multi" && correct.length === 0)
+      ) {
+        alert("Select correct answer");
+        return;
+      }
+    }
+
+    if (questionType === "short" || questionType === "descriptive") {
+
+      const words = correctText.trim()
+        ? correctText.trim().split(/\s+/)
+        : [];
+
+      if (!correctText.trim()) {
+        alert("Correct answer is required");
+        return;
+      }
+
+      if (questionType === "short") {
+        if (words.length < 20 || words.length > 30) {
+          alert("Short answer must be between 20 to 30 words");
+          return;
+        }
+      }
+
+      if (questionType === "descriptive") {
+        if (words.length < 100 || words.length > 200) {
+          alert("Descriptive answer must be between 100 to 200 words");
+          return;
+        }
+      }
+    }
+
+    const newQuestion = {
+      title,
+      question,
+      options,
+      correct,
+      correctText,
+      questionType
+    };
+
     setQuestionsList([...questionsList, newQuestion]);
 
     setQuestion("");
+    setCorrectText("");
     setOptions(["", ""]);
-    setCorrect(questionType === "multi" ? [] : "");
+    setCorrect("");
+
     setQuestionType("");
     setShowModal(true);
   };
 
   const clearQuestion = () => {
     setQuestion("");
+    setCorrectText("");
     setOptions(["", ""]);
-    setCorrect(questionType === "multi" ? [] : "");
+    setCorrect("");
   };
 
   const removeQuestionFromList = (index) => {
-    setQuestionsList(questionsList.filter((_, i) => i !== index));
+
+    const updated = questionsList.filter((_, i) => i !== index);
+    setQuestionsList(updated);
+
+    setQuestion("");
+    setCorrectText("");
+    setOptions(["", ""]);
+    setCorrect("");
+
+    setQuestionType("");
+    setShowModal(true);
   };
 
   const submitAllQuestions = () => {
-    if (!questionsList.length) return alert("Add at least one question");
+
+    if (!questionsList.length) {
+      alert("Add at least one question");
+      return;
+    }
 
     localStorage.setItem("question", JSON.stringify(questionsList));
 
-    // Clear state
     setQuestionsList([]);
     setTitle("");
     clearQuestion();
+
+    setQuestionType("");
     setShowModal(true);
 
-    // ✅ Show alert box
     alert("Quiz created successfully!");
-
-    // Navigate to home page
     navigate("/");
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        backgroundImage: `url(${bgImage})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundAttachment: "fixed",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        py: 6,
-      }}
-    >
-      <QuestionTypeModal
-        open={showModal}
-        value={questionType}
-        onSelect={(type) => {
-          setQuestionType(type);
-          setCorrect(type === "multi" ? [] : "");
-          setShowModal(false);
-        }}
-      />
 
-      <Card
-        sx={{
-          width: "100%",
-          maxWidth: 900,
-          maxHeight: "85vh",
-          overflowY: "auto",
-          borderRadius: 5,
-          p: 5,
-          background: "rgba(255,255,255,0.9)",
-          backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255,255,255,0.6)",
-          boxShadow: "0 15px 40px rgba(0,0,0,0.2)",
-        }}
-      >
-        <Typography variant="h4" fontWeight={700} mb={1}>
-          Create Question {questionNumber}
-        </Typography>
+<Box
+  sx={{
+    minHeight: "100vh",
+    backgroundImage: `url(${bgImage})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundAttachment: "fixed",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    py: 6,
+  }}
+>
 
-        <Typography variant="body2" mb={3}>
-          Question Type: <strong>{questionType ? questionType.toUpperCase() : "Not Selected"}</strong>
-        </Typography>
+<QuestionTypeModal
+  open={showModal}
+  value={questionType}
 
-        <Divider sx={{ mb: 4 }} />
+  onClose={() => {
+    if (!questionType) return;
+    setShowModal(false);
+  }}
 
-        <TextField
-          fullWidth
-          label="Quiz Title"
-          value={title}
-          disabled={questionsList.length > 0}
-          onChange={(e) => setTitle(e.target.value)}
-          sx={{ mb: 3 }}
-        />
+  onSelect={(data) => {
 
-        <TextField
-          fullWidth
-          multiline
-          rows={3}
-          label={`Enter Question ${questionNumber}`}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          sx={{ mb: 3 }}
-        />
+    if (!data?.type) return;
 
-        <Typography fontWeight={500} mb={2}>
-          Options
-        </Typography>
+    setQuestionType(data.type);
+    setCorrect(data.type === "multi" ? [] : "");
+    setShowModal(false);
+  }}
+/>
 
-        <Stack spacing={2}>
-          {options.map((opt, i) => {
-            const isSelected = questionType === "single" ? correct === i : correct?.includes?.(i);
-            return (
-              <Card
-                key={i}
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  border: isSelected ? "2px solid #1976d2" : "1px solid rgba(0,0,0,0.1)",
-                  backgroundColor: isSelected ? "rgba(25,118,210,0.08)" : "rgba(255,255,255,0.7)",
-                }}
-              >
-                <Box display="flex" alignItems="center">
-                  {questionType === "single" ? (
-                    <Radio checked={isSelected} onChange={() => setCorrect(i)} />
-                  ) : (
-                    <Checkbox
-                      checked={isSelected}
-                      onChange={() => {
-                        if (isSelected) setCorrect((prev) => prev.filter((c) => c !== i));
-                        else setCorrect((prev) => [...prev, i]);
-                      }}
-                    />
-                  )}
+<Card
+  sx={{
+    width: "100%",
+    maxWidth: 900,
+    maxHeight: "85vh",
+    overflowY: "auto",
+    borderRadius: 5,
+    p: 5,
+    background: "rgba(255,255,255,0.9)",
+  }}
+>
 
-                  <TextField fullWidth value={opt} label={`Option ${i + 1}`} onChange={(e) => handleOptionChange(i, e.target.value)} />
+<Typography variant="h4" fontWeight={700}>
+Create Question {questionNumber}
+</Typography>
 
-                  {options.length > 2 && (
-                    <Button color="error" onClick={() => removeOption(i)} sx={{ ml: 2 }}>
-                      <DeleteIcon />
-                    </Button>
-                  )}
+<Typography variant="body2" mb={3}>
+  Question Type:
+  <strong style={{ color: questionType ? "green" : "red" }}>
+    {questionType ? questionType.toUpperCase() : " NOT SELECTED"}
+  </strong>
+</Typography>
 
-                  {isSelected && <Chip icon={<CheckCircleIcon />} label="Correct" color="primary" size="small" sx={{ ml: 2 }} />}
-                </Box>
-              </Card>
-            );
-          })}
-        </Stack>
+<Divider sx={{ mb: 3 }} />
 
-        <Button startIcon={<AddIcon />} onClick={addOption} disabled={options.length >= 4} sx={{ mt: 3 }}>
-          Add Option
-        </Button>
+<TextField
+fullWidth
+label="Quiz Title"
+value={title}
+disabled={questionsList.length > 0}
+onChange={(e) => setTitle(e.target.value)}
+sx={{ mb: 3 }}
+/>
 
-        <Divider sx={{ my: 4 }} />
+<TextField
+fullWidth
+multiline
+rows={3}
+label={`Enter Question ${questionNumber}`}
+value={question}
+onChange={(e) => handleQuestionChange(e.target.value)}
+sx={{ mb: 3 }}
+/>
 
-        <Stack direction="row" spacing={2}>
-          <Button variant="contained" color="error" fullWidth onClick={clearQuestion}>
-            Clear
-          </Button>
+{(questionType === "short" || questionType === "descriptive") && (
 
-          <Button variant="contained" fullWidth onClick={addQuestionToList}>
-            Add Question
-          </Button>
-        </Stack>
+<TextField
+fullWidth
+label="Enter Correct Answer"
+value={correctText}
+onChange={(e) => {
 
-        {questionsList.length > 0 && (
-          <>
-            <Divider sx={{ my: 4 }} />
-            <Typography variant="h6" mb={2}>
-              Added Questions
-            </Typography>
+  const value = e.target.value;
+  const words = value.trim() ? value.trim().split(/\s+/) : [];
 
-            <Stack spacing={3}>
-              {questionsList.map((q, index) => (
-                <Card key={index} sx={{ p: 3, borderRadius: 3 }}>
-                  <Box display="flex" justifyContent="space-between" mb={2}>
-                    <Typography fontWeight={600}>
-                      {index + 1}. {q.question}
-                    </Typography>
+  if (questionType === "short") {
+    if (words.length > 30) {
+      alert("Short answer cannot exceed 30 words");
+      return;
+    }
+  }
 
-                    <Button size="small" color="error" onClick={() => removeQuestionFromList(index)}>
-                      Remove
-                    </Button>
-                  </Box>
+  if (questionType === "descriptive") {
+    if (words.length > 200) {
+      alert("Descriptive answer cannot exceed 200 words");
+      return;
+    }
+  }
 
-                  <Stack spacing={1}>
-                    {q.options.map((opt, i) => {
-                      const isCorrect = q.questionType === "single" ? q.correct === i : q.correct.includes(i);
-                      return (
-                        <Box
-                          key={i}
-                          sx={{
-                            p: 1,
-                            borderRadius: 2,
-                            backgroundColor: isCorrect ? "rgba(76,175,80,0.15)" : "rgba(0,0,0,0.04)",
-                            border: isCorrect ? "1px solid #4caf50" : "1px solid transparent",
-                          }}
-                        >
-                          <Typography variant="body2">
-                            {i + 1}. {opt}
-                            {isCorrect && <Chip label="Correct" size="small" color="success" sx={{ ml: 1 }} />}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Stack>
-                </Card>
-              ))}
-            </Stack>
+  setCorrectText(value);
+}}
+sx={{ mb: 3 }}
+/>
 
-            <Button variant="contained" color="success" fullWidth sx={{ mt: 3 }} onClick={submitAllQuestions}>
-              Save Quiz
-            </Button>
-          </>
-        )}
-      </Card>
-    </Box>
-  );
+)}
+
+{(questionType === "single" || questionType === "multi") && (
+
+<>
+
+<Typography fontWeight={500} mb={2}>
+Options
+</Typography>
+
+<Stack spacing={2}>
+
+{options.map((opt, i) => {
+
+const isSelected =
+questionType === "single"
+? correct === i
+: Array.isArray(correct) && correct.includes(i);
+
+return (
+
+<Card key={i} sx={{ p: 2 }}>
+
+<Box display="flex" alignItems="center">
+
+{questionType === "single" ? (
+
+<Radio
+checked={isSelected}
+onClick={() =>
+setCorrect(isSelected ? "" : i)
+}
+/>
+
+) : (
+
+<Checkbox
+checked={isSelected}
+onClick={() => {
+if (isSelected)
+setCorrect((prev) => prev.filter((c) => c !== i));
+else
+setCorrect((prev) => [...prev, i]);
+}}
+/>
+
+)}
+
+<TextField
+fullWidth
+label={`Option ${i + 1}`}
+value={opt}
+onChange={(e) =>
+handleOptionChange(i, e.target.value)
+}
+/>
+
+{options.length > 2 && (
+
+<Button
+color="error"
+onClick={() => removeOption(i)}
+>
+<DeleteIcon />
+</Button>
+
+)}
+
+{isSelected && (
+
+<Chip
+icon={<CheckCircleIcon />}
+label="Correct"
+color="primary"
+size="small"
+/>
+
+)}
+
+</Box>
+
+</Card>
+
+);
+
+})}
+
+</Stack>
+
+<Button
+startIcon={<AddIcon />}
+onClick={addOption}
+disabled={options.length >= 4}
+sx={{ mt: 2 }}
+>
+Add Option
+</Button>
+
+</>
+
+)}
+
+<Divider sx={{ my: 4 }} />
+
+<Stack direction="row" spacing={2}>
+
+<Button
+variant="contained"
+color="error"
+fullWidth
+onClick={clearQuestion}
+>
+Clear
+</Button>
+
+<Button
+variant="contained"
+fullWidth
+onClick={addQuestionToList}
+>
+Add Question
+</Button>
+
+</Stack>
+
+{questionsList.length > 0 && (
+
+<>
+<Divider sx={{ my: 4 }} />
+
+<Typography variant="h6">
+Added Questions
+</Typography>
+
+<Stack spacing={3}>
+
+{questionsList.map((q, index) => (
+
+<Card key={index} sx={{ p: 3 }}>
+
+<Box display="flex" justifyContent="space-between">
+
+<Typography fontWeight={600}>
+{index + 1}. {q.question}
+</Typography>
+
+<Button
+color="error"
+onClick={() => removeQuestionFromList(index)}
+>
+Remove
+</Button>
+
+</Box>
+
+{(q.questionType === "single" || q.questionType === "multi") && (
+
+<Stack spacing={1} mt={2}>
+
+{q.options.map((opt, i) => {
+
+const isCorrect =
+q.questionType === "single"
+? q.correct === i
+: q.correct.includes(i);
+
+return (
+
+<Typography key={i}>
+{i + 1}. {opt} {isCorrect && "✔"}
+</Typography>
+
+);
+
+})}
+
+</Stack>
+
+)}
+
+{(q.questionType === "short" || q.questionType === "descriptive") && (
+
+<Box mt={2}>
+<Typography>
+<strong>Correct Answer:</strong> {q.correctText}
+</Typography>
+</Box>
+
+)}
+
+</Card>
+
+))}
+
+</Stack>
+
+<Button
+variant="contained"
+color="success"
+fullWidth
+sx={{ mt: 3 }}
+onClick={submitAllQuestions}
+>
+Save Quiz
+</Button>
+
+</>
+
+)}
+
+</Card>
+
+</Box>
+
+);
 }
